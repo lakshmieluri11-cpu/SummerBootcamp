@@ -1,5 +1,3 @@
-pip install streamlit openai python-dotenv
-
 import streamlit as st
 import datetime
 import os
@@ -153,4 +151,5 @@ else:
     if st.button("Reset Session"):
         st.session_state.age_group = None
         st.session_state.score = 0
+
         st.rerun()
