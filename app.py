@@ -1,19 +1,16 @@
 import streamlit as st
 import datetime
-import os
 from openai import OpenAI
-from dotenv import load_dotenv
-
-def create_agents(api_key: str):
-    llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key)
 
 # -----------------------------
-# SETUP
+# PAGE CONFIG
 # -----------------------------
-load_dotenv()
-client = OpenAI()
-
 st.set_page_config(page_title="Brain Gym AI", layout="centered")
+
+# -----------------------------
+# OPENAI CLIENT (STREAMLIT CLOUD SAFE)
+# -----------------------------
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # -----------------------------
 # SESSION STATE INIT
@@ -27,9 +24,12 @@ if "score" not in st.session_state:
 if "child_name" not in st.session_state:
     st.session_state.child_name = None
 
+if "current_activity" not in st.session_state:
+    st.session_state.current_activity = None
+
 
 # -----------------------------
-# AGE LOGIC
+# AGE CALCULATION
 # -----------------------------
 def calculate_age(dob):
     today = datetime.date.today()
@@ -41,11 +41,11 @@ def calculate_age(dob):
 
 def get_age_group(age):
     if age <= 7:
-        return "A"
+        return "A"  # Memory & Colors
     elif age <= 12:
-        return "B"
+        return "B"  # Logic & Math
     else:
-        return "C"
+        return "C"  # Advanced Reasoning
 
 
 # -----------------------------
@@ -68,26 +68,26 @@ def generate_activity(age_group, difficulty):
     prompt = f"""
     Create one short brain training activity for a child.
 
-    Age Group A: 5-7 years (memory, colors).
-    Age Group B: 8-12 years (logic, speed math).
-    Age Group C: 13-16 years (advanced reasoning).
+    Age Group A (5-7 years): memory games, colors.
+    Age Group B (8-12 years): logic puzzles, speed math.
+    Age Group C (13-16 years): reasoning, analytical thinking.
 
     Age Group: {age_group}
     Difficulty: {difficulty}
 
-    Provide:
+    Provide clearly:
     1. Title
-    2. Challenge question
-    3. Correct answer
-    4. Short explanation
+    2. Challenge
+    3. Correct Answer
+    4. Short Explanation
 
-    Keep it simple and short.
+    Keep it short and simple.
     """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a child brain training expert."},
+            {"role": "system", "content": "You are an expert brain trainer for children."},
             {"role": "user", "content": prompt}
         ]
     )
@@ -101,20 +101,24 @@ def generate_activity(age_group, difficulty):
 if st.session_state.age_group is None:
 
     st.title("🧠 Brain Gym AI")
-    st.subheader("Login")
+    st.subheader("Child Login")
 
     name = st.text_input("Child Name")
     dob = st.date_input("Date of Birth")
 
     if st.button("Start Training"):
-        age = calculate_age(dob)
-        age_group = get_age_group(age)
+        if name and dob:
+            age = calculate_age(dob)
+            age_group = get_age_group(age)
 
-        st.session_state.age_group = age_group
-        st.session_state.child_name = name
+            st.session_state.child_name = name
+            st.session_state.age_group = age_group
+            st.session_state.score = 0
 
-        st.success(f"Welcome {name}! Age Group: {age_group}")
-        st.rerun()
+            st.success(f"Welcome {name}! Age Group: {age_group}")
+            st.rerun()
+        else:
+            st.warning("Please enter all details.")
 
 
 # -----------------------------
@@ -124,32 +128,36 @@ else:
 
     st.title(f"Welcome {st.session_state.child_name} 👋")
     st.write(f"Age Group: {st.session_state.age_group}")
-    st.write(f"Current Score: {st.session_state.score}")
+    st.write(f"Score: {st.session_state.score}")
 
     difficulty = adjust_difficulty(st.session_state.score)
     st.write(f"Difficulty Level: {difficulty}")
 
     if st.button("🎯 Generate Brain Challenge"):
-
-        with st.spinner("Creating brain activity..."):
-            activity = generate_activity(st.session_state.age_group, difficulty)
-
+        with st.spinner("Creating challenge..."):
+            activity = generate_activity(
+                st.session_state.age_group,
+                difficulty
+            )
         st.session_state.current_activity = activity
 
-    if "current_activity" in st.session_state:
+    if st.session_state.current_activity:
         st.subheader("Today's Brain Challenge")
         st.write(st.session_state.current_activity)
 
-        result = st.radio("Did the child answer correctly?", ["Select", "Yes", "No"])
+        result = st.radio(
+            "Did the child answer correctly?",
+            ["Select", "Yes", "No"]
+        )
 
         if result == "Yes":
             st.session_state.score += 10
-            st.success("Great Job! Score +10")
+            st.success("Great job! +10 points")
         elif result == "No":
-            st.info("Keep practicing!")
+            st.info("Keep practicing 💪")
 
-    if st.button("Reset Session"):
+    if st.button("🔄 Reset Session"):
         st.session_state.age_group = None
         st.session_state.score = 0
-
+        st.session_state.current_activity = None
         st.rerun()
